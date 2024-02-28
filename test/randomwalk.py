@@ -4,12 +4,14 @@ import sys
 
 sys.path.append("../")
 
+import ludopy2
 
 def randwalk():
-    import ludopy
-    import numpy as np
+    # import ludopy
+    # import numpy as np
 
-    g = ludopy.Game()
+    # g = ludopy.Game()
+    g = ludopy2.Game()
     there_is_a_winner = False
 
     n_moves = 0
@@ -17,9 +19,11 @@ def randwalk():
     while not there_is_a_winner:
         (dice, move_pieces, player_pieces, enemy_pieces, player_is_a_winner,
          there_is_a_winner), player_i = g.get_observation()
-
+        
+        # Implements random Player Move:
         if len(move_pieces):
-            piece_to_move = move_pieces[np.random.randint(0, len(move_pieces))]
+            # piece_to_move = move_pieces[np.random.randint(0, len(move_pieces))]
+            piece_to_move = g.get_player_move(player_i, move_pieces)
         else:
             piece_to_move = -1
 
@@ -45,7 +49,7 @@ def randwalk():
         new_hist_2["current_dice"].append(current_dice)
         new_hist_2["current_player"].append(current_player)
         new_hist_2["round"].append(round)
-    print(new_hist_2)
+    #print(new_hist_2)
     return True
 
 

@@ -1,8 +1,8 @@
-import ludopy
+import ludopy2
 import numpy as np
 import cv2
 
-g = ludopy.Game()
+g = ludopy2.Game()
 there_is_a_winner = False
 
 while not there_is_a_winner:

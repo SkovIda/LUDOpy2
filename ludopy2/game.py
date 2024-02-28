@@ -1,8 +1,10 @@
 import collections
 
-from .player import Player
+#from player import Player, RandomPlayer
 from .visualizer import make_img_of_board, save_hist_video
 import numpy as np
+
+from .player_random import RandomPlayer
 
 
 class Game:
@@ -86,7 +88,8 @@ class Game:
         Resets the game and the game history
 
         """
-        self.players = [Player(), Player(), Player(), Player()]
+        # self.players = [Player(), Player(), Player(), Player()]
+        self.players = [RandomPlayer(), RandomPlayer(), RandomPlayer(), RandomPlayer()]
         self.hist = collections.defaultdict(list)
         self.round = 1
         self.current_player = 0
@@ -345,3 +348,6 @@ class Game:
         """
         moment_hist = [self._get_from_hist_moment(i) for i in range(len(self.hist[list(self.hist.keys())[0]]))]
         save_hist_video(video_out, moment_hist, fps=fps, frame_size=frame_size, fourcc=fourcc)
+
+    def get_player_move(self, player_idx, player_move_pieces):
+        return self.players[player_idx].next_move(player_move_pieces)

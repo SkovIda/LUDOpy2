@@ -1,10 +1,10 @@
 import cv2
 
-import ludopy
-from ludopy.player import GOAL_INDEX
+import ludopy2
+from ludopy2.player import GOAL_INDEX
 import numpy as np
 
-g = ludopy.Game()
+g = ludopy2.Game()
 there_is_a_winner = False
 
 i = 0

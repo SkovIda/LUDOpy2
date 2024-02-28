@@ -329,3 +329,7 @@ class Player:
         for i in range(self.number_of_pieces):
             self.pieces.append(HOME_INDEX)
 
+
+# class RandomPlayer(Player):
+#     def next_move(self, move_pieces):
+#         return move_pieces[np.random.randint(0, len(move_pieces))]

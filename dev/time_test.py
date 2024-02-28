@@ -1,10 +1,10 @@
-import ludopy
+import ludopy2
 import numpy as np
 import time
 
 
 def make_time_test():
-    g = ludopy.Game()
+    g = ludopy2.Game()
     there_is_a_winner = False
 
     n_moves = 0

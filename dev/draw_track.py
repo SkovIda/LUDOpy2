@@ -1,4 +1,4 @@
-from ludopy import visualizer
+from ludopy2 import visualizer
 import cv2
 
 board = visualizer.draw_basic_board(draw_taile_number=False)

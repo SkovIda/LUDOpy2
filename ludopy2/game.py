@@ -5,6 +5,7 @@ from .visualizer import make_img_of_board, save_hist_video
 import numpy as np
 
 from .player_random import RandomPlayer
+from .player_neat import NEATPlayer
 
 
 class Game:
@@ -12,7 +13,7 @@ class Game:
     The Game. This class is the only needed class for normal use
     """
 
-    def __init__(self, ghost_players=None):
+    def __init__(self, players=[RandomPlayer(), RandomPlayer(), RandomPlayer(), RandomPlayer()],ghost_players=None):
         """
         Maked a game with 4 players
 
@@ -21,7 +22,7 @@ class Game:
         """
         if ghost_players is None:
             ghost_players = []
-        self.reset()
+        self.reset(players)
         self.enemys_order = {
             0: [1, 2, 3],
             1: [2, 3, 0],
@@ -83,13 +84,15 @@ class Game:
                   self.hist["current_player"][i], self.hist["round"][i]]
         return moment
 
-    def reset(self):
+    def reset(self, players=[RandomPlayer(), RandomPlayer(), RandomPlayer(), RandomPlayer()]):
         """
         Resets the game and the game history
 
         """
         # self.players = [Player(), Player(), Player(), Player()]
-        self.players = [RandomPlayer(), RandomPlayer(), RandomPlayer(), RandomPlayer()]
+        # self.players = [RandomPlayer(), RandomPlayer(), RandomPlayer(), RandomPlayer()]
+        self.players = players
+        # self.players = [NEATPlayer(), RandomPlayer(), RandomPlayer(), RandomPlayer()]
         self.hist = collections.defaultdict(list)
         self.round = 1
         self.current_player = 0
@@ -349,5 +352,12 @@ class Game:
         moment_hist = [self._get_from_hist_moment(i) for i in range(len(self.hist[list(self.hist.keys())[0]]))]
         save_hist_video(video_out, moment_hist, fps=fps, frame_size=frame_size, fourcc=fourcc)
 
-    def get_player_move(self, player_idx, player_move_pieces):
-        return self.players[player_idx].next_move(player_move_pieces)
+    # def get_player_move(self, player_idx, player_move_pieces):
+    #     return self.players[player_idx].next_move(player_move_pieces)
+    
+    def get_player_move(self, player_idx, dice):
+        if isinstance(self.players[player_idx],RandomPlayer):
+            return self.players[player_idx].next_move(dice)
+        else:
+            player_pieces, enemy_pieces = self.get_pieces(seen_from=player_idx)
+            return self.players[player_idx].next_move(dice, player_pieces, enemy_pieces)

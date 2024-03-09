@@ -47,20 +47,30 @@ class NEATPlayer(Player):
         enemy_pieces_pos = np.reshape(_enemy_pieces, (1,12))
         net_input = np.concatenate((dice, own_pieces_pos, can_move_piece_list, enemy_pieces_pos), axis=None)
         # net_input = np.concatenate(dice, own_pieces_pos, can_move_piece_list, enemy_pieces_pos, axis=1)
-        print(type(net_input))
-        print(net_input)
+        # print(type(net_input))
+        # print(net_input)
         
-        # net_input.extend(enemy_pieces_flattened)
-        # net_input.extend(dice)
-        print(f'type(net_input)={type(net_input)}')
+        # print(f'type(net_input)={type(net_input)}')
         net_output = self.net.activate(net_input)
-        print(f'type(net_output)={type(net_output)}')
-        # # Get the output move from the network and round to nearest legal move:
-        print("NET OUTPUT:")
-        print(f'\tBEFORE ACTION SELECT:\n\t{net_output}')
-        next_move = min(move_pieces, key=lambda x:abs(x-net_output[0]))
-        print(f'\tAFTER ACTION SELECT:\n\t{next_move}')
-        return next_move #min(move_pieces, key=lambda x:abs(x-net_output[0]))
+        # print(f'type(net_output)={type(net_output)}')
+
+        # # Print the input of the net:
+        # print("\tINPUT:")
+        # print(f'\t\t{net_input}')
+        # # # Get the output move from the network and choose the preferred legal move based on net output
+        # print("\tOUTPUT:")
+        # print(f'\t\t{net_output}')
+        # # print(f'\tBEFORE OUTPUT MASK:\n\t{net_output}')
+        # # next_move = min(move_pieces, key=lambda x:abs(x-net_output[0]))
+        
+        next_move_preferences = np.array(net_output) * np.array(can_move_piece_list)
+        # print(f'\t\tAFTER OUTPUT MASK:\n\t\t{next_move_preferences}')
+        # # print(next_move_preferences)
+        next_move_sorted = np.argsort(next_move_preferences)
+        next_move = next_move_sorted[::-1]
+        # print(f'\t\tACTION PREFERENCE:\n\t\t{next_move[0]}')
+        # print(f'\t\tCHOSEN ACTION:\n\t\t{next_move[0]}')
+        return next_move[0] #min(move_pieces, key=lambda x:abs(x-net_output[0]))
 
     # def next_move(self, move_pieces):
     #     net_output = self.net.activate()
@@ -153,6 +163,7 @@ def train_ai(genome1, genome2, genome3, genome4, config):
 # xor_inputs = [(0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (1.0, 1.0)]
 # xor_outputs = [   (0.0,),     (1.0,),     (1.0,),     (0.0,)]
 
+
 def eval_genomes(genomes, config):
     # for genome_id, genome in genomes:
     #     genome.fitness = 4.0
@@ -183,6 +194,7 @@ def eval_genomes(genomes, config):
                     winner_genome_id, winner_genome = genomes[genomes_list_idx[winner_genome_game_idx]]
                     winner_genome.fittness += 1.0
                     #_in_game = [genome_1, genome_2, genome_3, genome_4]
+
 
 
 

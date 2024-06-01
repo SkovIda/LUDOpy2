@@ -6,9 +6,11 @@ import numpy as np
 
 from .player_random import RandomPlayer
 from .player_neat import NEATPlayer
+from .player_qlearn import QPlayer
+from .player import BORD_TILES, HOME_AREAL_INDEXS, STAR_AT_GOAL_AREAL_INDX, ENEMY_1_GLOB_INDX, ENEMY_2_GLOB_INDX, ENEMY_3_GLOB_INDX
 
 
-class Game:
+class Game(object):
     """
     The Game. This class is the only needed class for normal use
     """
@@ -30,6 +32,17 @@ class Game:
             3: [0, 1, 2]
         }
         self.ghost_players = ghost_players
+        # print("Game.__init__() called")
+
+        return
+
+    # def __del__(self):
+    #     # print(f'\n\tWINNER:\t{self.first_winner_was}')
+    #     # self.reset()
+    #     # print(f'\n\tWINNER:\t{self.first_winner_was}')
+    #     # print(f'\n\tPLAYERS:\t{self.players}')
+    #     # print(f'\n\tWINNING ORDER:\t{self.game_winners}')
+    #     print("GAME: I'm being automatically destroyed. Goodbye!")
 
     def _dice_generator(self):
         """
@@ -37,6 +50,20 @@ class Game:
 
         """
         self.current_dice = np.random.randint(1, 6 + 1)
+
+    # def _transform_enemy_pieces_to_current_players_view(self, _seen_from, _enemy_pieces):
+    #     if _seen_from is not None:
+    #         print(_seen_from)
+    #         print(self.enemys_order[_seen_from])
+    #         enemy_pos_seen_from_current_player = np.array((3, 4))
+    #         for enemy in self.enemys_order[_seen_from]:
+    #             for enemy_piece in _enemy_pieces[enemy]:
+    #                 if enemy_piece >= 52:
+
+    #                 # enemy_pos_seen_from_current_player[enemy] = 
+    #         print(_enemy_pieces)
+    #     return
+
 
     def get_pieces(self, seen_from=None):
         """
@@ -61,6 +88,8 @@ class Game:
             pieces = self.players[seen_from].get_pieces()
             # Get where the enemy's piece are
             enemy_pieces = [self.players[e].get_pieces() for e in self.enemys_order[seen_from]]
+        
+        # self._transform_enemy_pieces_to_current_players_view(seen_from, enemy_pieces)
         return pieces, enemy_pieces
 
     def _make_moment(self):
@@ -92,6 +121,8 @@ class Game:
         # self.players = [Player(), Player(), Player(), Player()]
         # self.players = [RandomPlayer(), RandomPlayer(), RandomPlayer(), RandomPlayer()]
         self.players = players
+        for player in self.players:
+            player.reset()
         # self.players = [NEATPlayer(), RandomPlayer(), RandomPlayer(), RandomPlayer()]
         self.hist = collections.defaultdict(list)
         self.round = 1
@@ -358,6 +389,106 @@ class Game:
     def get_player_move(self, player_idx, dice):
         if isinstance(self.players[player_idx],RandomPlayer):
             return self.players[player_idx].next_move(dice)
-        else:
+        elif isinstance(self.players[player_idx],NEATPlayer):
             player_pieces, enemy_pieces = self.get_pieces(seen_from=player_idx)
-            return self.players[player_idx].next_move(dice, player_pieces, enemy_pieces)
+            # # return self.players[player_idx].next_move(dice, player_pieces, enemy_pieces)
+            # return self.players[player_idx].next_move_2(dice, self.get_game_state(_seen_from=player_idx))
+            # # TODO: Make this other representation yourself???
+            # # self.get_game_state(_seen_from=player_idx)
+            return self.players[player_idx].next_move_abstract_state_rep(dice, player_pieces, enemy_pieces)
+            # self.calc_bitmaps(enemy_pieces)
+        elif isinstance(self.players[player_idx], QPlayer):
+            player_pieces, enemy_pieces = self.get_pieces(seen_from=player_idx)
+            move_pieces = self.players[player_idx].get_pieces_that_can_move(dice)
+            return self.players[player_idx].next_move(player_idx, player_pieces, enemy_pieces, dice, move_pieces)
+        else:
+            print("\n\nPLAYER IS NOT A VALID PLAYER INSTANCE!!!\n\n")
+            return -1
+    
+    # def calc_bitmaps(self, _enemies):
+    #     enemy_pieces_on_common_fields = np.zeros((len(_enemies), len(BORD_TILES)))
+    #     enemy_attack_map = np.zeros((len(_enemies), len(BORD_TILES)))
+    #     player_will_die_fields = np.zeros((len(_enemies), len(BORD_TILES)))
+    #     # print(np.shape(PLAYER_STATES))
+    #     print('\nENEMY BITMAPS:')
+    #     for i, enemy_pieces in enumerate(self.current_enemys):
+    #         for enemy_piece_idx in enemy_pieces:
+    #             if enemy_piece_idx < 52 and enemy_piece_idx != 0:
+    #                 enemy_pieces_on_common_fields[i][enemy_piece_idx] += 1
+    #                 if enemy_pieces_on_common_fields[i][enemy_piece_idx] >= 2:
+    #                     player_will_die_fields[i][enemy_piece_idx] = 1
+    #             if enemy_piece_idx < STAR_AT_GOAL_AREAL_INDX:
+    #                 enemy_attack_map[i][enemy_piece_idx+1:enemy_piece_idx+1+6] += 1
+    #             # elif enemy_piece_idx != 0:
+    #     print(enemy_pieces_on_common_fields)
+    #     print(enemy_attack_map)
+    #     print(player_will_die_fields)
+
+
+        
+    def get_game_state(self, _seen_from=None):
+        # print(BORD_TILES)
+        # print(np.shape(BOARD_COMMON_TILES))
+        # players_home_globe_idx = [1, ENEMY_1_GLOB_INDX, ENEMY_2_GLOB_INDX, ENEMY_3_GLOB_INDX]
+        BOARD_N_TILES_IN_SECTION = 13
+        BOARD_COMMON_TILES = np.zeros(BOARD_N_TILES_IN_SECTION*4)
+        BOARD_PLAYERS_HOME_COUNT = np.zeros(4)
+        BOARD_PLAYERS_GOAL_AREA = np.zeros((4, len(HOME_AREAL_INDEXS) + 1))
+        # BOARD_SECTION_1 = np.zeros(BOARD_N_TILES_IN_SECTION)
+        # BOARD_SECTION_2 = np.zeros(BOARD_N_TILES_IN_SECTION)
+        # BOARD_SECTION_3 = np.zeros(BOARD_N_TILES_IN_SECTION)
+        # BOARD_SECTION_4 = np.zeros(BOARD_N_TILES_IN_SECTION)
+        PLAYER_STATES = np.zeros((4, len(BORD_TILES)))
+        # # self.players
+        # for piece_idx in self.players[self.current_player].get_pieces():
+        #     PLAYER_STATES[0][piece_idx] += 1   #np.zeros((4, len(BORD_TILES)))
+        # for i, enemy_pieces in enumerate(self.current_enemys):
+        #     for enemy_piece_idx in enemy_pieces:
+        #         PLAYER_STATES[i+1][enemy_piece_idx] += 1
+        # # print(self.current_enemys)
+        # print(PLAYER_STATES)
+
+        if _seen_from is None:
+            game_players = self.players
+        else:
+            game_players = [self.players[i] for i in self.enemys_order]
+        
+        for i, player in enumerate(game_players):
+            player_i_pieces = player.get_pieces()
+            # print(f'PLAYER {i}: {player_i_pieces}')
+            for piece_idx in player_i_pieces:
+                PLAYER_STATES[i][piece_idx] +=1
+        #         # if piece_idx < 52 and piece_idx != 0:
+        #         if piece_idx >= 52:
+        #             # print(f'GOAL AREA:\tPLAYER {i}\tINDEX {piece_idx - 52}')
+        #             BOARD_PLAYERS_GOAL_AREA[i][piece_idx-52] += 1                    
+        #         elif piece_idx == 0:
+        #             BOARD_PLAYERS_HOME_COUNT[i] += 1
+        #         else:
+        #             new_idx = (piece_idx - 1 + i * BOARD_N_TILES_IN_SECTION) % len(BOARD_COMMON_TILES)
+        #             print(f'\tpos changed to: {new_idx}')
+        #             # BOARD_COMMON_TILES[new_idx] = piece_idx
+        #             BOARD_COMMON_TILES[new_idx] = i+1 # represent players as 1, 2, 3, or 4
+        #             # if new_idx > len(BOARD_COMMON_TILES):
+
+        #     # print(f'\tPos shifted by: {i*BOARD_N_TILES_IN_SECTION}\n\t{(player_i_pieces) + i*BOARD_N_TILES_IN_SECTION}')
+
+        #     # for piece_idx in player_i_pieces:
+        #     #     if piece_idx >= 52 or piece_idx == 0:
+        #     #         continue
+        #     #     else:
+        #     #         new_idx = piece_idx + player_shift_idx[i]
+        #     #         if new_idx >= len(BOARD_COMMON_TILES):
+
+        #     #         BOARD_COMMON_TILES[]
+        # print(BORD_TILES)
+        # # print(BOARD_COMMON_TILES)
+        # # print(BOARD_PLAYERS_HOME_COUNT)
+        # # print(BOARD_PLAYERS_GOAL_AREA)
+        # # print("\n")
+        BOARD_TILES = np.array(BORD_TILES).reshape(1,58)
+        # print(np.shape(BOARD_TILES))
+        # print(np.concatenate((BOARD_TILES,PLAYER_STATES)) )
+        # print(PLAYER_STATES.flatten())
+        # return np.array(PLAYER_STATES).flatten()
+        return np.concatenate((BOARD_TILES,PLAYER_STATES))

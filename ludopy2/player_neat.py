@@ -1,24 +1,107 @@
+import neat.genes
+import neat.genome
 import numpy as np
 import time
 import itertools
 
-# from __future__ import print_function
 import os
 import neat
-#import visualize
 
 from .player import Player
+from .state_space_rep import StateSpace, PieceState
 import ludopy2
 
-# TODO: Use the neat-python xor example to build a NEAT LUDO Player - see ../neat/evolve-feedforward.py
-# NOTE: tutorial for training Pong player with neat-python: https://www.youtube.com/watch?v=2f6TmKm7yx0
-# See the "monopoly AI video on youtube" for training (turnament setup and fitness values): https://www.youtube.com/watch?v=dkvFcYBznPI
+# NOTE: See the "monopoly AI video on youtube" for training (turnament setup and fitness values): https://www.youtube.com/watch?v=dkvFcYBznPI
 
 class NEATPlayer(Player):
     def load_neat_net(self, _genome, _config):
         self.genome = _genome
         self.config = _config
         self.net = neat.nn.FeedForwardNetwork.create(self.genome, self.config)
+
+        # self.abstract_state_rep = StateSpace()
+        self.abstract_state_rep = np.zeros((4,8))
+
+    # def generate_abstract_net_input(self, dice, player_pieces, enemy_pieces):
+    #     # Possible actions for each piece:
+    #     return np.reshape(self.abstract_state_rep.get_state(dice, player_pieces, enemy_pieces),(4,12))
+    
+    def generate_abstract_net_input(self, dice, player_pieces, enemy_pieces):
+        # print(f'\n\nPLAYER_PIECES:\t{player_pieces}')
+        # print(f'ENEMY_PIECES:\t{enemy_pieces}')
+        # print(f'DICE:\t{dice}')
+
+        for i, piece in enumerate(player_pieces):
+            piece_state = self.get_effect_of_move(dice, piece, enemy_pieces)
+            # print(f'PIECE {i} POS: {piece}')
+            # piece_state.print_piece_next_state()
+            self.abstract_state_rep[i][:] = piece_state.piece_state_as_np_array()
+        
+        return self.abstract_state_rep
+    
+    def next_move_abstract_state_rep(self, dice, player_pieces, enemy_pieces):
+        # TODO: Implement move selection based on network trained with an abstract state representation as input.
+        move_pieces = self.get_pieces_that_can_move(dice)
+        
+        if len(move_pieces) == 1:
+            return move_pieces[0]
+        
+        can_move_piece_list = [0, 0, 0, 0]
+        for move_piece_idx in move_pieces:
+            can_move_piece_list[move_piece_idx] = 1
+        
+        next_move_preferences = np.zeros(4)
+        next_states = self.generate_abstract_net_input(dice, player_pieces, enemy_pieces)
+        for move_piece_idx in range(4):
+            if can_move_piece_list[move_piece_idx] != 0:
+                #     score = 0
+                #     next_move_preferences[].append(0)
+                # else:
+                net_input = next_states[move_piece_idx]#list(itertools.chain.from_iterable(next_states[move_piece_idx]))
+                score = self.net.activate(net_input)
+                # print(score)
+                next_move_preferences[move_piece_idx] = score[0]
+                # possible_moves.append(NEATMove(move_piece_idx, score))
+        
+        next_move_sorted = np.argsort(next_move_preferences)
+        
+        next_move = []
+        for move in next_move_sorted[::-1]:
+            if move in move_pieces:
+                next_move = move
+                break
+        return next_move
+        
+    def next_move_2(self, dice, board_state):
+        move_pieces = self.get_pieces_that_can_move(dice)
+
+        if len(move_pieces) == 1:
+            return move_pieces[0]
+        
+        can_move_piece_list = [0, 0, 0, 0]
+        for move_piece_idx in move_pieces:
+            can_move_piece_list[move_piece_idx] = 1
+
+        board_state_flattend = list(itertools.chain.from_iterable(board_state[1:5]))
+        # print(board_state[1:5])
+        # board_state_flattend = list(itertools.chain.from_iterable(board_state))
+
+        # print(np.shape(board_state_flattend))
+
+        net_input = np.concatenate((dice, board_state_flattend), axis=None)
+        net_output = self.net.activate(net_input)
+
+        next_move_preferences = np.array(net_output) * np.array(can_move_piece_list)
+        next_move_sorted = np.argsort(next_move_preferences)
+        
+        next_move = []
+        for move in next_move_sorted[::-1]:
+            if move in move_pieces:
+                next_move = move
+                break
+        
+        return next_move
+
 
     def next_move(self, dice, _player_pieces, _enemy_pieces):
         move_pieces = self.get_pieces_that_can_move(dice)
@@ -30,11 +113,7 @@ class NEATPlayer(Player):
         for move_piece_idx in move_pieces:
             can_move_piece_list[move_piece_idx] = 1
 
-        # own_pieces = self.get_pieces(_player_pieces)
         own_pieces_pos = _player_pieces
-        # enemy_0_pieces = _enemy_pieces[0]
-        # enemy_1_pieces = _enemy_pieces[1]
-        # enemy_2_pieces = _enemy_pieces[2]
         enemy_pieces_pos = list(itertools.chain.from_iterable(_enemy_pieces))
 
         # Input to NEAT Net:
@@ -50,16 +129,30 @@ class NEATPlayer(Player):
         # print(type(net_input))
         # print(net_input)
         
-        # print(f'type(net_input)={type(net_input)}')
+        # # Advantage calculations:
+        # # TODO: Look at different inputs to the network and see how it affects the agents performance:
+        # # # 1) Advantage: sum of tiles betwween all 4 tokens and goal for self and sum of tiles to goal for all 4 tokens for each of the 3 opponents
+        # own_tiles_to_goal = sum(57 - own_pieces_pos)
+        # # print(own_tiles_to_goal)
+        # enemy_tiles_to_goal = [sum(57 - pieces) for pieces in _enemy_pieces]
+        # # print(enemy_tiles_to_goal)
+        # print(enemy_tiles_to_goal - own_tiles_to_goal)
+        # # # 1a) State at t+1 by moving the token will result in a risky state
+        # # # 1b) State at t+1 will result in recovering the advantage
+        # # # NOTE: advantage is min(enemy_tiles_to_goal, key=lambda x:abs(x-own_tiles_to_goal))
+        # print(f'approx. advantage = {max(enemy_tiles_to_goal-own_tiles_to_goal, key=lambda x:abs(x-own_tiles_to_goal))}')
+        # # # 2) Pieces' risk of being killed? (propability of each token being killed by an opponent in one turn)
+        # # # 2a) Should result in higher values for moving the most delayed piece. If no risk for any tokens, this will no affect the action selection.
+
         net_output = self.net.activate(net_input)
         # print(f'type(net_output)={type(net_output)}')
 
         # # Print the input of the net:
-        # print("\tINPUT:")
-        # print(f'\t\t{net_input}')
+        # print("\n\tINPUT:")
+        # print(f'\n\tINPUT:\t{net_input}')
         # # # Get the output move from the network and choose the preferred legal move based on net output
         # print("\tOUTPUT:")
-        # print(f'\t\t{net_output}')
+        # print(f'\tOUTPUT:\t{np.round(net_output, decimals=5)}')
         # # print(f'\tBEFORE OUTPUT MASK:\n\t{net_output}')
         # # next_move = min(move_pieces, key=lambda x:abs(x-net_output[0]))
         
@@ -67,10 +160,18 @@ class NEATPlayer(Player):
         # print(f'\t\tAFTER OUTPUT MASK:\n\t\t{next_move_preferences}')
         # # print(next_move_preferences)
         next_move_sorted = np.argsort(next_move_preferences)
-        next_move = next_move_sorted[::-1]
-        # print(f'\t\tACTION PREFERENCE:\n\t\t{next_move[0]}')
+        
+        next_move = []
+        for move in next_move_sorted[::-1]:
+            if move in move_pieces:
+                next_move = move
+                break
+        # next_move = next_move_sorted[::-1]
+
+        # print(f'\t\tACTION PREFERENCE:\n\t\t{next_move}')
         # print(f'\t\tCHOSEN ACTION:\n\t\t{next_move[0]}')
-        return next_move[0] #min(move_pieces, key=lambda x:abs(x-net_output[0]))
+        # return next_move[0] #min(move_pieces, key=lambda x:abs(x-net_output[0]))
+        return next_move
 
     # def next_move(self, move_pieces):
     #     net_output = self.net.activate()
@@ -85,6 +186,7 @@ class NEATPlayer(Player):
     #         for xi, xo in zip(xor_inputs, xor_outputs):
     #             output = net.activate(xi)
     #             genome.fitness -= (output[0] - xo[0]) ** 2
+
 
 
 
@@ -153,7 +255,7 @@ def train_ai(genome1, genome2, genome3, genome4, config):
     end_time = time.time()
     used_time = end_time - start_time
     moves_per_sec = n_moves / used_time
-    print("Moves per sec:", moves_per_sec)
+    # print("Moves per sec:", moves_per_sec)
 
     # Return the winner of the game
     return g.first_winner_was
@@ -358,6 +460,102 @@ def run_neat(config_file):
 #     #     new_hist_2["round"].append(round)
 #     return True
 
+############### Attemp at init Neat player from genome params - not successfull
+# class BestNEATPlayer(Player):
+#     def load_neat_net(self, _config):
+#         self.genome = neat.DefaultGenome(key=26)
+#         # Setup params of best genome:
+                
+#         # DefaultNodeGene(key=26, bias=0.7055400746108504, response=1.0, activation=sigmoid, aggregation=sum))
+#         self.genome.nodes = {'0': neat.genes.DefaultNodeGene(key=0, bias=0.847109424165768, response=1.0, activation='sigmoid', aggregation=sum),
+#                              '26': neat.genes.DefaultNodeGene(key=26, bias=0.7055400746108504, response=1.0, activation='sigmoid', aggregation=sum)}
+#         self.genome.connections = {neat.genes.DefaultConnectionGene(key=(-8, 0), weight=0.2909629425132466, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-8, 26), weight=1.0600724647637576, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-7, 0), weight=0.6904576012917878, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-7, 26), weight=1.2376852237596465, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-6, 0), weight=-1.8264530205496488, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-6, 26), weight=0.20402443501278095, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-5, 0), weight=-0.15339405692719424, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-5, 26), weight=1.4803382235725915, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-4, 0), weight=0.6215101999583793, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-4, 26), weight=-0.27315269143048665, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-3, 0), weight=0.6633100586245813, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-3, 26), weight=0.9866490432677778, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-2, 0), weight=-0.10201759284315223, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-2, 26), weight=-0.27482991509394106, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-1, 0), weight=1.4222920503544052, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(-1, 26), weight=-0.5433930664667177, enabled=True),
+#                             neat.genes.DefaultConnectionGene(key=(26, 0), weight=-0.3112685735210641, enabled=True)
+#                             }
+        
+#         self.genome.fitness = 65.0
+
+#         self.config = _config
+#         self.net = neat.nn.FeedForwardNetwork.create(self.genome, self.config)
+
+#         self.abstract_state_rep = np.zeros((4,8))
+    
+#     def generate_abstract_net_input(self, dice, player_pieces, enemy_pieces):
+#         for i, piece in enumerate(player_pieces):
+#             piece_state = self.get_effect_of_move(dice, piece, enemy_pieces)
+#             self.abstract_state_rep[i][:] = piece_state.piece_state_as_np_array()
+#         return self.abstract_state_rep
+    
+#     def next_move_abstract_state_rep(self, dice, player_pieces, enemy_pieces):
+#         move_pieces = self.get_pieces_that_can_move(dice)
+        
+#         if len(move_pieces) == 1:
+#             return move_pieces[0]
+        
+#         can_move_piece_list = [0, 0, 0, 0]
+#         for move_piece_idx in move_pieces:
+#             can_move_piece_list[move_piece_idx] = 1
+        
+#         next_move_preferences = np.zeros(4)
+#         next_states = self.generate_abstract_net_input(dice, player_pieces, enemy_pieces)
+#         for move_piece_idx in range(4):
+#             if can_move_piece_list[move_piece_idx] != 0:
+#                 net_input = next_states[move_piece_idx]
+#                 score = self.net.activate(net_input)
+#                 next_move_preferences[move_piece_idx] = score[0]
+#         next_move_sorted = np.argsort(next_move_preferences)
+        
+#         next_move = []
+#         for move in next_move_sorted[::-1]:
+#             if move in move_pieces:
+#                 next_move = move
+#                 break
+#         return next_move
+    
+#     def get_genome(self):
+#         return self.genome
+
+
+# def eval_best_neat_player(config_file):
+#     # Load configuration.
+#     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+#                          neat.DefaultSpeciesSet, neat.DefaultStagnation,
+#                          config_file)
+
+#     # # Create the population, which is the top-level object for a NEAT run.
+#     # p = neat.Population(config)
+    
+#     # # # Restore population from checkpoint: 
+#     # # p = neat.Checkpointer.restore_checkpoint('neat-checkpoint-4')
+
+#     # # Add a stdout reporter to show progress in the terminal.
+#     # p.add_reporter(neat.StdOutReporter(True))
+#     # stats = neat.StatisticsReporter()
+#     # p.add_reporter(stats)
+#     # p.add_reporter(neat.Checkpointer(1))
+
+#     # # Run for up to 300 generations.
+#     # winner = p.run(eval_genomes, 1)
+
+#     # # Display the winning genome.
+#     best_genome = BestNEATPlayer(config)
+#     print('\nBest genome:\n{!s}'.format(best_genome.get_genome()))
+
 
 
 if __name__ == '__main__':
@@ -367,3 +565,4 @@ if __name__ == '__main__':
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, 'player_neat_config.txt')
     run_neat(config_path)
+

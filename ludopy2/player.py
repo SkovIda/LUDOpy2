@@ -1,5 +1,8 @@
 import numpy as np
 
+import itertools
+from .state_space_rep import PieceState
+
 TOTAL_NUMBER_OF_TAILES = 58
 DICE_MOVE_OUT_OF_HOME = 6
 NO_ENEMY = -1
@@ -46,6 +49,9 @@ BORD_TILES[ENEMY_3_GLOB_INDX] = TAILE_ENEMY_3_GLOB
 ENEMY_1_INDX_AT_HOME = 40  # HOME_AREAL_INDEXS[0] - 6 - i * 13 # i = 1
 ENEMY_2_INDX_AT_HOME = 27  # HOME_AREAL_INDEXS[0] - 6 - i * 13 # i = 2
 ENEMY_3_INDX_AT_HOME = 14  # HOME_AREAL_INDEXS[0] - 6 - i * 13 # i = 3
+
+
+NON_DANGER_TILES = [HOME_INDEX, START_INDEX, GOAL_INDEX] + HOME_AREAL_INDEXS + GLOB_INDEXS
 
 
 def enemy_pos_at_pos(pos):
@@ -118,8 +124,98 @@ def get_enemy_at_pos(pos, enemys):
 
     return enemy_at_pos, enemy_pieces_at_pos
 
+def enemies_can_attack(pos, enemies):
+    # enemy_pos_for_piece_danger = [pos - i for i in range(1,7)]
+    danger_fields_from_enemy_view = []
+    
+    for i, enemy_pieces in enumerate(enemies):
+        enemy_attack_fields = []
+        for enemy_piece in enemy_pieces:
+            for pos_offset in range(1,7):
+                danger_pos = enemy_piece + pos_offset
+                if danger_pos > STAR_AT_GOAL_AREAL_INDX:
+                    break
+                enemy_attack_fields.append(danger_pos)
+        danger_fields_from_enemy_view.append(set(enemy_attack_fields))
+        
+        #if danger_pos + enemy_glob_indices[i] > STAR_AT_GOAL_AREAL_INDX:
+    enemy_glob_indices = [ENEMY_1_GLOB_INDX, ENEMY_2_GLOB_INDX, ENEMY_3_GLOB_INDX]
+    # player_home_from_enemy_view = [ENEMY_1_INDX_AT_HOME, ENEMY_2_INDX_AT_HOME, ENEMY_3_INDX_AT_HOME]
+    # danger_fields_from_player_view = []
+    # print(f'ENEMIES:\n{enemies}')
+    # print(f'DANGER FIELD FROM ENEMY VIEW:\n{danger_fields_from_enemy_view}')
+    BOARD_N_TILES_IN_SECTION = 13
 
-class Player:
+    possible_field_indices = []
+    for i, enemy_can_reach_field in enumerate(danger_fields_from_enemy_view):
+        
+        for field_enemy_view in enemy_can_reach_field:
+            field_player_view = field_enemy_view + enemy_glob_indices[i]
+            if field_player_view <= STAR_AT_GOAL_AREAL_INDX:
+                possible_field_indices.append(field_player_view)
+            else:
+                field_player_view = field_player_view % (BOARD_N_TILES_IN_SECTION*4)
+                possible_field_indices.append(field_player_view)
+
+                # field_from_player_view = field_enemy_view - player_home_from_enemy_view[i]
+                # if field_enemy_view > 0 and field_enemy_view <= STAR_AT_GOAL_AREAL_INDX:
+                # if field_enemy_view 
+                
+                #possible_field_indices.append(field_enemy_view - enemy_glob_indices[i])
+                #possible_field_indices.append(field_enemy_view + player_home_from_enemy_view[i])
+    
+    # print(possible_field_indices)
+    # danger_fields = [field for field in possible_field_indices if field > 0 and field <= STAR_AT_GOAL_AREAL_INDX]
+    danger_fields = possible_field_indices
+
+    # enemy_pos_for_piece_danger = []
+
+    # enemy_glob_indices = [ENEMY_1_GLOB_INDX, ENEMY_2_GLOB_INDX, ENEMY_3_GLOB_INDX]
+    # player_home_from_enemy_view = [ENEMY_1_INDX_AT_HOME, ENEMY_2_INDX_AT_HOME, ENEMY_3_INDX_AT_HOME]
+    # for pos_offset in range(1, 7):
+    #     danger_pos = pos - pos_offset
+        
+                
+    #         # if enemy_pieces
+
+
+
+    # for pos_offset in range(1,7):
+    #     danger_pos = pos - pos_offset
+    #     if danger_pos > 1:
+    #         danger_fields.append(danger_pos)
+    #     elif danger_pos < 0:
+    #         danger_fields.append()
+
+    # if danger_pos > 0:
+    #     danger_fields.append(danger_pos)
+    # elif danger_pos < 0
+    # get_enemy_at_pos(danger_pos, enemies)
+    
+    # danger_fields_flattened = list(itertools.chain.from_iterable(danger_fields))
+    # print(danger_fields_flattened)
+    # return danger_fields_flattened
+    return danger_fields
+
+
+    # return enemy_pos
+    # danger_fields = []
+    # for i, enemy_pieces in enumerate(enemies):
+    #     for piece in enemy_pieces:
+    #         if piece
+        
+
+    # attack_fields = []
+    # for i, enemy_pieces in enumerate(enemies):
+    #     for piece in enemy_pieces:
+    #         if piece < STAR_AT_GOAL_AREAL_INDX:
+    #             for attack_dice_needed in range(1, 7):
+    #                 attack_field = piece + attack_dice_needed
+    #                 if attack_field <= STAR_AT_GOAL_AREAL_INDX:
+    #                     attack_fields.append()
+
+
+class Player(object):
     """
     A class used by the Game class. This class is not needed for normal use
     """
@@ -328,7 +424,166 @@ class Player:
         self.pieces = []
         for i in range(self.number_of_pieces):
             self.pieces.append(HOME_INDEX)
+    
+    def reset(self):
+        self.set_all_pieces_to_home()
+        return
+    
+    ######################################
+    # TODO: Needs Testing to check if the move danger fields are correct!
+    def get_effect_of_move(self, dice, piece, enemys):
+        move_piece_state = PieceState()
+        
+        # enemys_new = enemys.copy()
+        old_piece_pos = piece   # self.pieces[piece]
+        new_piece_pos = old_piece_pos + dice
 
+        move_enemy_home_from_pos = []
+        do_not_check_rule_a = False
+        enemy_at_pos, enemy_pieces_at_pos = get_enemy_at_pos(new_piece_pos, enemys)
+
+        # If the dice is 0 then no movement can be done
+        if dice == 0:
+            pass
+
+        # At goal
+        elif BORD_TILES[old_piece_pos] == TAILE_GOAL:
+            # The piece can not move
+            pass
+
+        # Goal areal
+        elif BORD_TILES[old_piece_pos] == TAILE_GOAL_AREAL:
+            if new_piece_pos <= GOAL_INDEX:
+                move_piece_state.will_be_home_streatch = True
+                # move_piece_state.will_be_safe = True
+            else:
+                overshoot = new_piece_pos - GOAL_INDEX
+                new_piece_pos_corrected = old_piece_pos - overshoot
+                if BORD_TILES[new_piece_pos_corrected] == TAILE_GOAL_AREAL:
+                    move_piece_state.will_be_home_streatch = True
+                    move_piece_state.will_be_safe = True
+
+        # The Home areal
+        elif BORD_TILES[old_piece_pos] == TAILE_HOME:
+            if dice == DICE_MOVE_OUT_OF_HOME:
+                move_piece_state.can_activate = True
+                move_piece_state.will_be_safe = True
+
+                # Set the enemy there might be at START_INDEX to moved
+                do_not_check_rule_a = True
+                move_enemy_home_from_pos.append(START_INDEX)
+
+        # Star before the home areal
+        elif new_piece_pos == STAR_AT_GOAL_AREAL_INDX:
+            # self.pieces[piece] = GOAL_INDEX
+            move_piece_state.can_star = True
+            move_piece_state.can_goal = True
+            # move_piece_state.will_be_safe = True
+
+            # Set the enemy there might be at STAR_AT_GOAL_AREAL_INDX to moved
+            move_enemy_home_from_pos.append(new_piece_pos)
+
+        # The other stars
+        elif BORD_TILES[new_piece_pos] == TAILE_STAR:
+            present_star_staridx = STAR_INDEXS.index(new_piece_pos)
+            next_star_staridx = present_star_staridx + 1
+            if next_star_staridx >= len(STAR_INDEXS):
+                next_star_staridx = 0
+            next_star_pos = STAR_INDEXS[next_star_staridx]
+
+            move_piece_state.can_star = True
+
+            # Set the enemy there might be at first star or the start there will be jump to to be moved
+            if enemy_at_pos != NO_ENEMY:
+                move_enemy_home_from_pos.append(new_piece_pos)
+
+            next_star_enemy_at_pos, next_star_enemy_pieces_at_pos = get_enemy_at_pos(next_star_pos, enemys)
+            if next_star_enemy_at_pos != NO_ENEMY:
+                move_enemy_home_from_pos.append(next_star_pos)
+
+        # Globs there are not own by enemy
+        elif BORD_TILES[new_piece_pos] == TAILE_GLOB:
+            if enemy_at_pos != NO_ENEMY:
+                # self.pieces[piece] = HOME_INDEX
+                move_piece_state.will_be_killed = True
+            else:
+                # self.pieces[piece] = new_piece_pos
+                move_piece_state.will_be_safe = True
+
+        # Globs there are own by enemy
+        elif BORD_TILES[new_piece_pos] in LIST_TAILE_ENEMY_GLOBS:
+            # Get the enemy there own the glob
+            globs_enemy = LIST_TAILE_ENEMY_GLOBS.index(BORD_TILES[new_piece_pos])
+            # Check if there is a enemy at the glob
+            if enemy_at_pos != NO_ENEMY:
+                # If there is a other enemy then send them home and move there
+                if enemy_at_pos != globs_enemy:
+                    move_enemy_home_from_pos.append(new_piece_pos)
+                    # self.pieces[piece] = new_piece_pos
+                # If it is the same enemy there is there them move there
+                else:
+                    # self.pieces[piece] = HOME_INDEX
+                    move_piece_state.will_be_killed = True
+            # If there ant any enemy at the glob then move there
+            else:
+                # self.pieces[piece] = new_piece_pos
+                if HOME_INDEX in enemys[enemy_at_pos]:  # TODO: Check if this is correct syntax!
+                    move_piece_state.will_be_danger = True
+
+        # If it is a TAILE_FREE or if we move from a GLOB/STAR to a not done case
+        elif BORD_TILES[old_piece_pos] == TAILE_FREE or \
+                BORD_TILES[new_piece_pos] == TAILE_FREE or \
+                BORD_TILES[old_piece_pos] == TAILE_GLOB or \
+                BORD_TILES[old_piece_pos] == TAILE_STAR:
+            if enemy_at_pos != NO_ENEMY:
+                move_enemy_home_from_pos.append(new_piece_pos)
+            # self.pieces[piece] = new_piece_pos
+
+        # If the case was not caught then there is a error
+        else:
+            print("\nold_piece_pos:", old_piece_pos, "\nnew_piece_pos", new_piece_pos,
+                  "\nBORD_TILES[old_piece_pos]:", BORD_TILES[old_piece_pos],
+                  "\nBORD_TILES[new_piece_pos]:", BORD_TILES[new_piece_pos], "\ndice:", dice)
+            raise RuntimeError("The new_piece_pos case was not handel")
+
+        # Check if there is any enemy there has to be moved
+        if len(move_enemy_home_from_pos):
+            # Go through the pos where enemy has to be moved from
+            for pos in move_enemy_home_from_pos:
+                # Get the enemy at the pos
+                enemy_at_pos, enemy_pieces_at_pos = get_enemy_at_pos(pos, enemys)
+                # Check if there was a enemy at the pos
+                if enemy_at_pos != NO_ENEMY:
+                    # If there is only one enemy then move the enemy home.
+                    if not do_not_check_rule_a and not PLAY_WITH_RULE_A or len(enemy_pieces_at_pos) == 1:
+                        move_piece_state.can_kill = True
+                        # for enemy_piece in enemy_pieces_at_pos:
+                        #     enemys_new[enemy_at_pos][enemy_piece] = HOME_INDEX
+                    # If there is more than one then move own piece home
+                    else:
+                        # self.pieces[piece] = HOME_INDEX
+                        move_piece_state.will_be_killed = True
+
+        # if not (move_piece_state.will_be_safe or move_piece_state.will_be_home_streatch):
+        # if old_piece_pos != HOME_INDEX and old_piece_pos != GOAL_INDEX and old_piece_pos != GLOB_INDEXS and old_piece_pos != START_INDEX and not (old_piece_pos in HOME_AREAL_INDEXS):
+        # print(NON_DANGER_TILES)
+        # TODO: Check if piece can move out of danger: move_piece_state.can_avoid_danger:
+        # if not (old_piece_pos in NON_DANGER_TILES):
+        # TODO: Check if piece is in danger of being killed by an opponent before next turn
+        danger_fields = enemies_can_attack(old_piece_pos, enemys)
+        if new_piece_pos in danger_fields:
+            move_piece_state.will_be_danger = True
+        if (old_piece_pos in danger_fields) and not move_piece_state.will_be_danger:
+            move_piece_state.will_avoid_danger = True
+        
+        # print(danger_fields)
+
+        # if len(danger_fields) > 0:
+        #     # print(f'OLD PIECE POS:\t{old_piece_pos}')
+        #     print(f'DANGER POS:\t{danger_fields}')
+        #     # print(f'ENEMIES PIECE POS:\n{enemys}')
+        #     if old_piece_pos in
+        return move_piece_state
 
 # class RandomPlayer(Player):
 #     def next_move(self, move_pieces):
